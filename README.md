@@ -23,7 +23,7 @@ wget https://raw.githubusercontent.com/dwisetyawan00/PWR-Chain/main/pwr-setup.sh
 ```
 ## 2. Cek Private-key kalian yang telah kalian bikin
 ```bash
-sudo java -jar validator.jar get-private-key [YOUR_VALIDATOR_PASSWORD]
+sudo java -jar validator.jar get-private-key password
 ```
 
 ## 3. Cek address kalian
