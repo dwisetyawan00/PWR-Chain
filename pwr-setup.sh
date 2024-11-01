@@ -24,16 +24,43 @@ display_logo() {
     curl -s https://raw.githubusercontent.com/dwisetyawan00/dwisetyawan00.github.io/main/logo.sh | bash
 }
 
-# Press Enter to Continue
-press_enter_to_continue() {
-    read -p "${YELLOW}Press Enter to continue...${RESET}" continue_key
+# Manual Password Input and File Creation
+manual_password_input() {
+    while true; do
+        read -s -p "Enter your desired validator password: " VALIDATOR_PASSWORD
+        echo  # New line
+        read -s -p "Confirm your password: " CONFIRM_PASSWORD
+        echo  # New line
+
+        if [[ "$VALIDATOR_PASSWORD" == "$CONFIRM_PASSWORD" ]]; then
+            # Create password file
+            echo -e "${YELLOW}[*] Creating password file...${RESET}"
+            echo "$VALIDATOR_PASSWORD" > password
+            chmod 600 password  # Restrict file permissions
+            break
+        else
+            echo -e "${RED}Passwords do not match. Please try again.${RESET}"
+        fi
+    done
 }
 
-# System and dependency check
-system_check() {
-    echo -e "${YELLOW}[*] Checking system requirements...${RESET}"
+# Manual IP Input
+manual_ip_input() {
+    while true; do
+        read -p "Masukkan IP VPS anda: " VPS_IP
+        if validate_ip "$VPS_IP"; then
+            break
+        else
+            echo -e "${RED}Invalid IP address. Please try again.${RESET}"
+        fi
+    done
+}
+
+# Prerequisites Check
+prerequisites_check() {
+    echo -e "${YELLOW}[*] Checking system prerequisites...${RESET}"
     
-    # Check if Ubuntu/Debian
+    # Check Ubuntu/Debian
     if ! command -v apt &> /dev/null; then
         echo -e "${RED}[-] This script supports Ubuntu/Debian systems only.${RESET}"
         exit 1
@@ -44,117 +71,56 @@ system_check() {
         echo -e "${RED}[-] This script must be run as root. Use sudo.${RESET}"
         exit 1
     fi
-}
 
-# Install dependencies
-install_dependencies() {
-    echo -e "${YELLOW}[*] Installing required dependencies...${RESET}"
-    apt update
-    apt install -y git wget curl ufw software-properties-common
-    
-    # Install Docker
-    if ! command -v docker &> /dev/null; then
-        curl -fsSL https://get.docker.com -o get-docker.sh
-        sh get-docker.sh
-        systemctl enable docker
-        systemctl start docker
-    fi
-}
-
-# Configure firewall
-configure_firewall() {
-    local ports=("22" "22/tcp" "8545" "30303" "30303/udp")
-    
-    echo -e "${YELLOW}[*] Configuring firewall...${RESET}"
-    
-    for port in "${ports[@]}"; do
-        ufw allow "$port" 
+    # Check required ports
+    REQUIRED_PORTS=("8231" "8085" "7621")
+    for port in "${REQUIRED_PORTS[@]}"; do
+        echo -e "${YELLOW}[*] Checking port $port...${RESET}"
+        ufw allow "$port"
     done
+}
+
+# Download Validator Components
+download_validator_components() {
+    echo -e "${YELLOW}[*] Downloading PWR Validator components...${RESET}"
     
-    ufw enable
-}
-
-# PWR Validator Installation
-install_pwr_validator() {
-    local vps_ip=$1
-    local validator_password=$2
-
-    echo -e "${YELLOW}[*] Cloning PWR Validator repository...${RESET}"
-    git clone https://github.com/pwrlabs/PWR-Validator.git /opt/pwr-validator
-    cd /opt/pwr-validator
-
-    echo -e "${YELLOW}[*] Preparing validator configuration...${RESET}"
-    cat > .env << EOL
-VALIDATOR_IP=$vps_ip
-VALIDATOR_PASSWORD=$validator_password
-EOL
-}
-
-# Create systemd service
-create_systemd_service() {
-    echo -e "${YELLOW}[*] Creating systemd service for PWR Validator...${RESET}"
+    # Download validator.jar
+    wget https://github.com/pwrlabs/PWR-Validator/releases/download/13.0.0/validator.jar
     
-    cat > /etc/systemd/system/pwr-validator.service << EOL
-[Unit]
-Description=PWR Validator Service
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=simple
-WorkingDirectory=/opt/pwr-validator
-ExecStart=/usr/bin/docker-compose up
-ExecStop=/usr/bin/docker-compose down
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOL
-
-    systemctl daemon-reload
-    systemctl enable pwr-validator
-    systemctl start pwr-validator
+    # Download config.json
+    wget https://github.com/pwrlabs/PWR-Validator/raw/refs/heads/main/config.json
 }
 
-# Main installation function
+# Main Installation Function
 main() {
     clear
     
     # Display Logo
     display_logo
     
-    # Press Enter to Continue
-    press_enter_to_continue
+    echo -e "${GREEN}PWR Validator Setup${RESET}"
     
-    echo -e "${GREEN}PWR Validator Automated Installer${RESET}"
+    # Manual Password Input
+    manual_password_input
     
-    # Input VPS IP
-    while true; do
-        read -p "Enter your VPS IP address: " VPS_IP
-        if validate_ip "$VPS_IP"; then
-            break
-        else
-            echo -e "${RED}Invalid IP address. Please try again.${RESET}"
-        fi
-    done
-
-    # Input Validator Password
-    read -p "Enter desired validator password: " VALIDATOR_PASSWORD
-
-    system_check
-    install_dependencies
-    configure_firewall
-    install_pwr_validator "$VPS_IP" "$VALIDATOR_PASSWORD"
-    create_systemd_service
-
-    echo -e "${GREEN}[✓] PWR Validator installation complete!${RESET}"
-    echo -e "${YELLOW}You can manage the service with:${RESET}"
-    echo "- systemctl start pwr-validator"
-    echo "- systemctl stop pwr-validator"
-    echo "- systemctl restart pwr-validator"
-    echo "- systemctl status pwr-validator"
+    # Manual IP Input
+    manual_ip_input
+    
+    # Prerequisites Check
+    prerequisites_check
+    
+    # Download Validator Components
+    download_validator_components
+    
+    # Run Validator
+    echo -e "${YELLOW}[*] Starting PWR Validator...${RESET}"
+    nohup sudo java -jar validator.jar "$VALIDATOR_PASSWORD" "$VPS_IP" --compression-level 0 &
+    
+    echo -e "${GREEN}[✓] PWR Validator setup complete!${RESET}"
+    echo -e "${YELLOW}Useful Commands:${RESET}"
+    echo "- Get Node Address: curl localhost:8085/address/"
+    echo "- Get Private Key: sudo java -jar validator.jar get-private-key $VALIDATOR_PASSWORD"
 }
 
-# Run main function
+# Execute Main Function
 main
