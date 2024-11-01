@@ -49,6 +49,7 @@ sudo journalctl -u pwr -f
 - Open Ticket
 ## *NOTE*
 ### *SEMENTARA FORM/TICKET CLOSED AKAN DIUPDATE JIKA SUDAH BUKA PANTENGIN AJA DISINI*
+### *FILL FORM WAITLIST* [FORM](https://forms.gle/4QBi8tnNff1iug917)
 
 ### *Jika sudah mendapatkan role*
 - Ke Server #PWR-Chain (Claim Faucet Kalo Udah Punya Role)
