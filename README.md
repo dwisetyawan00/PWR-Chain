@@ -1,5 +1,9 @@
   # AUTO INSTALL PWR-CHAIN VALIDATOR NODE
-  
+  ![Banner](https://pbs.twimg.com/profile_banners/1688483944520454144/1696841331/1500x500)
+
+## TESTNET PWRCHAIN
+- Download [WALLET](https://chromewebstore.google.com/u/3/detail/pwr-wallet/kennjipeijpeengjlogfdjkiiadhbmjl)
+- LINK [TESTNET](https://airdrop.pwrlabs.io?referral_code=e32d3b5a-4ede-435c-bd38-5e7c162d6bda)
 
 ## System Requirements
 
@@ -34,11 +38,18 @@ sudo java -jar validator.jar get-private-key password
 ```bash
 curl http://[IP_VPS_ANDA]:8085/address/
 ```
+  ### ⚫ Check Log
+```bash
+sudo journalctl -u pwr -f
+```        
 
 ## 4. Join Discord dan Claim faucet jika sudah mendapatkan role
 - Join Discord [Disini](https://discord.gg/C3PRdT7N)
 - Claim Validator di Server #Validator-Node-Application
 - Open Ticket
+## *NOTE*
+### *SEMENTARA FORM/TICKET CLOSED AKAN DIUPDATE JIKA SUDAH BUKA PANTENGIN AJA DISINI*
+
 ### *Jika sudah mendapatkan role*
 - Ke Server #PWR-Chain (Claim Faucet Kalo Udah Punya Role)
 - Ketik /claim *`address-kalian-tadi`*
@@ -67,6 +78,14 @@ sudo systemctl status pwr-validator
 ```
   ### ⚫ Check Log
 ```bash
-sudo journalctl -u pwr-validator.service
+sudo journalctl -u pwr -f
 ```        
+
+
+
+
+
+
+
+
 
