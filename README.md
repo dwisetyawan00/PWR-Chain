@@ -19,7 +19,7 @@
 
 ## 1. Download Setup
 ```bash
-wget https://raw.githubusercontent.com/dwisetyawan00/PWR-Chain/main/pwr-setup.sh && chmod +x pwr-node.sh && ./pwr-node.sh
+wget https://raw.githubusercontent.com/dwisetyawan00/PWR-Chain/main/pwr-setup.sh && chmod +x pwr-setup.sh && ./pwr-setup.sh
 ```
 ## 2. Cek Private-key kalian yang telah kalian bikin
 ```bash
