@@ -21,6 +21,10 @@
 ```bash
 wget https://raw.githubusercontent.com/dwisetyawan00/PWR-Chain/main/pwr-setup.sh && chmod +x pwr-setup.sh && ./pwr-setup.sh
 ```
+- Masukkan Password
+- Masukkan IP VPS 
+- Tekan y ENTER
+
 ## 2. Cek Private-key kalian yang telah kalian bikin
 ```bash
 sudo java -jar validator.jar get-private-key password
