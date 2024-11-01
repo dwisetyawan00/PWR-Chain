@@ -1,9 +1,32 @@
 #!/bin/bash
-# Colors for output
+
+# Colors
 GREEN="\e[32m"
 RED="\e[31m"
-YELLOW="\e[33m"
+YELLOW="\e[34m"
+BLUE="\e[34m"
 RESET="\e[0m"
+
+# Utility functions
+exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+log() {
+    local type="$1"
+    local message="$2"
+    local color
+
+    case "$type" in
+        info) color="$BLUE" ;;
+        success) color="$GREEN" ;;
+        error) color="$RED" ;;
+        warning) color="$YELLOW" ;;
+        *) color="$RESET" ;;
+    esac
+
+    echo -e "${color}${message}${RESET}"
+}
 
 # Validate IP input
 validate_ip() {
@@ -17,27 +40,21 @@ validate_ip() {
     fi
 }
 
-# Display Logo
-display_logo() {
-    echo -e "${YELLOW}[*] Downloading and displaying logo...${RESET}"
-    curl -s https://raw.githubusercontent.com/dwisetyawan00/dwisetyawan00.github.io/main/logo.sh | bash
-}
-
 # Manual Password Input and File Creation
 manual_password_input() {
     while true; do
-        read -s -p "Enter your desired validator password: " VALIDATOR_PASSWORD
+        read -s -p "Masukkan passwordmu: " VALIDATOR_PASSWORD
         echo  # New line
-        read -s -p "Confirm your password: " CONFIRM_PASSWORD
+        read -s -p "Konfirmasi passwordmu: " CONFIRM_PASSWORD
         echo  # New line
         if [[ "$VALIDATOR_PASSWORD" == "$CONFIRM_PASSWORD" ]]; then
             # Create password file
-            echo -e "${YELLOW}[*] Creating password file...${RESET}"
-            echo "$VALIDATOR_PASSWORD" > password
+            log "info" "Creating password file..."
+            echo -n "$VALIDATOR_PASSWORD" > password
             chmod 600 password  # Restrict file permissions
             break
         else
-            echo -e "${RED}Passwords do not match. Please try again.${RESET}"
+            log "error" "Passwords do not match. Please try again."
         fi
     done
 }
@@ -45,114 +62,86 @@ manual_password_input() {
 # Manual IP Input
 manual_ip_input() {
     while true; do
-        read -p "Masukkan IP VPS anda: " VPS_IP
+        read -p "Enter your server IP: " VPS_IP
         if validate_ip "$VPS_IP"; then
             break
         else
-            echo -e "${RED}Invalid IP address. Please try again.${RESET}"
+            log "error" "Invalid IP address. Please try again."
         fi
     done
 }
 
-# Prerequisites Check
-prerequisites_check() {
-    echo -e "${YELLOW}[*] Checking system prerequisites...${RESET}"
+# Prerequisites Check and Installation
+install_prerequisites() {
+    log "info" "Updating and upgrading system..."
+    sudo apt update && sudo apt upgrade -y
+
+    local packages=(curl wget ufw openjdk-19-jre-headless)
     
-    # Check Ubuntu/Debian
-    if ! command -v apt &> /dev/null; then
-        echo -e "${RED}[-] This script supports Ubuntu/Debian systems only.${RESET}"
-        exit 1
-    fi
-    # Check root access
-    if [[ $EUID -ne 0 ]]; then
-        echo -e "${RED}[-] This script must be run as root. Use sudo.${RESET}"
-        exit 1
-    fi
-    # Check required ports
-    REQUIRED_PORTS=("8231" "8085" "7621")
-    for port in "${REQUIRED_PORTS[@]}"; do
-        echo -e "${YELLOW}[*] Checking port $port...${RESET}"
-        ufw allow "$port"
+    for package in "${packages[@]}"; do
+        if ! exists "$package"; then
+            log "info" "Installing $package..."
+            sudo apt install -y "$package"
+        else
+            log "success" "$package is already installed."
+        fi
+    done
+}
+
+# Firewall Configuration
+configure_firewall() {
+    log "info" "Configuring firewall..."
+    sudo ufw enable
+    
+    local ports=("22/tcp" "8231/tcp" "8085/tcp" "7621/udp")
+    for port in "${ports[@]}"; do
+        sudo ufw allow "$port"
     done
 }
 
 # Download Validator Components
 download_validator_components() {
-    echo -e "${YELLOW}[*] Downloading PWR Validator components...${RESET}"
+    log "info" "Downloading PWR Validator components..."
     
-    # Download validator.jar
+    # Download validator.jar from the correct release URL
     wget https://github.com/pwrlabs/PWR-Validator/releases/download/13.0.0/validator.jar
     
-    # Download config.json
+    # Download config.json from the correct repository path
     wget https://github.com/pwrlabs/PWR-Validator/raw/refs/heads/main/config.json
+    
+    # Verify downloads
+    if [[ -f validator.jar && -f config.json ]]; then
+        log "success" "Validator components downloaded successfully"
+    else
+        log "error" "Failed to download validator components"
+        exit 1
+    fi
 }
 
-# Create Systemd Service File
+# Create Systemd Service
 create_systemd_service() {
-    echo -e "${YELLOW}[*] Creating systemd service file...${RESET}"
+    log "info" "Creating systemd service..."
     
-    cat << EOF > /etc/systemd/system/pwr-validator.service
+    sudo tee /etc/systemd/system/pwr.service > /dev/null <<EOF
 [Unit]
-Description=PWR Validator Service
-After=network.target
+Description=PWR node
+After=network-online.target
 
 [Service]
-Type=simple
-User=root
-WorkingDirectory=$(pwd)
-ExecStart=/usr/bin/java -jar $(pwd)/validator.jar "$VALIDATOR_PASSWORD" "$VPS_IP" --compression-level 0
+User=$USER
+WorkingDirectory=$PWD
+ExecStart=/usr/bin/java -jar validator.jar password $VPS_IP --compression-level 0
 Restart=on-failure
 RestartSec=5
+LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-    # Reload systemd
-    systemctl daemon-reload
-    systemctl enable pwr-validator.service
-    systemctl start pwr-validator.service
-}
-
-# Cleanup Function
-cleanup_validator() {
-    echo -e "${YELLOW}[*] Starting PWR Validator cleanup process...${RESET}"
-
-    # Stop and disable systemd service
-    systemctl stop pwr-validator.service
-    systemctl disable pwr-validator.service
-    rm -f /etc/systemd/system/pwr-validator.service
-    systemctl daemon-reload
-
-    # Remove validator files
-    rm -f validator.jar
-    rm -f config.json
-    rm -f password
-    
-    # Close and remove firewall rules
-    REQUIRED_PORTS=("8231" "8085" "7621")
-    for port in "${REQUIRED_PORTS[@]}"; do
-        ufw delete allow "$port"
-    done
-    
-    # Remove log files
-    rm -f nohup.out
-    rm -f *.log
-    
-    echo -e "${GREEN}[✓] PWR Validator completely removed!${RESET}"
-}
-
-# Restart Validator Function
-restart_validator() {
-    echo -e "${YELLOW}[*] Restarting PWR Validator...${RESET}"
-    systemctl restart pwr-validator.service
-    echo -e "${GREEN}[✓] Validator restarted successfully!${RESET}"
-}
-
-# View Validator Logs
-view_validator_logs() {
-    echo -e "${YELLOW}[*] Displaying PWR Validator Logs...${RESET}"
-    journalctl -u pwr-validator.service -f
+    sudo systemctl daemon-reload
+    sudo systemctl enable pwr.service
+    sudo systemctl start pwr.service
 }
 
 # Main Installation Function
@@ -160,9 +149,14 @@ main() {
     clear
     
     # Display Logo
-    display_logo
+    log "info" "Downloading and displaying logo..."
+    curl -s https://raw.githubusercontent.com/dwisetyawan00/dwisetyawan00.github.io/main/logo.sh | bash
+    sleep 2
     
-    echo -e "${GREEN}PWR Validator Setup${RESET}"
+    log "info" "Memulai PWR Validator Setup..."
+    
+    # Install prerequisites
+    install_prerequisites
     
     # Manual Password Input
     manual_password_input
@@ -170,22 +164,22 @@ main() {
     # Manual IP Input
     manual_ip_input
     
-    # Prerequisites Check
-    prerequisites_check
+    # Configure Firewall
+    configure_firewall
     
-    # Download Validator Components
+    # Download Components
     download_validator_components
     
-    # Create and start systemd service
+    # Create and Start Service
     create_systemd_service
     
-    echo -e "${GREEN}[✓] PWR Validator setup complete!${RESET}"
-    echo -e "${YELLOW}Useful Commands:${RESET}"
+    log "success" "PWR Validator setup complete!"
+    log "info" "Useful Commands:"
     echo "- Get Node Address: curl localhost:8085/address/"
-    echo "- Get Private Key: sudo java -jar validator.jar get-private-key $VALIDATOR_PASSWORD"
-    echo "- Restart Validator: sudo systemctl restart pwr-validator"
-    echo "- Check Validator Status: sudo systemctl status pwr-validator"
-    echo "- View Logs: sudo journalctl -u pwr-validator.service"
+    echo "- Get Private Key: sudo java -jar validator.jar get-private-key password"
+    echo "- Check Service Status: sudo systemctl status pwr"
+    echo "- View Logs: sudo journalctl -u pwr -f"
+    echo "- Restart Service: sudo systemctl restart pwr"
 }
 
 # Execute Main Function
